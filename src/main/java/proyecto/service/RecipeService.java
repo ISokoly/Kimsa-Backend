@@ -137,4 +137,23 @@ public class RecipeService {
     public List<RecipeDetail> details(Integer idRecipe) {
         return detailRepo.findByRecipe_IdRecipe(idRecipe);
     }
+
+    public RecipeSummaryDTO findByProduct(Integer idProduct) {
+        Recipe r = recipeRepo.findByProduct_IdProduct(idProduct)
+                .orElseThrow(() -> new IllegalArgumentException("Recipe no encontrada para product " + idProduct));
+
+        long count = detailRepo.countByRecipe_IdRecipe(r.getIdRecipe());
+        return new RecipeSummaryDTO(
+                r.getIdRecipe(),
+                r.getProduct() != null ? r.getProduct().getIdProduct() : null,
+                r.getProduct() != null ? r.getProduct().getName() : null,
+                count
+        );
+    }
+
+    public List<RecipeDetail> detailsByProduct(Integer idProduct) {
+        Recipe r = recipeRepo.findByProduct_IdProduct(idProduct)
+                .orElseThrow(() -> new IllegalArgumentException("Recipe no encontrada para product " + idProduct));
+        return detailRepo.findByRecipe_IdRecipe(r.getIdRecipe());
+    }
 }

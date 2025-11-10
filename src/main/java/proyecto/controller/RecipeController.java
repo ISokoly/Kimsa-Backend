@@ -37,4 +37,14 @@ public class RecipeController {
     public List<RecipeDetail> details(@PathVariable Integer id) {
         return service.details(id);
     }
+
+    @GetMapping("/product/{idProduct}")
+    public RecipeSummaryDTO findByProduct(@PathVariable Integer idProduct) {
+        return service.findByProduct(idProduct);
+    }
+
+    @GetMapping("/product/{idProduct}/details")
+    public List<RecipeDetail> detailsByProduct(@PathVariable Integer idProduct) {
+        return service.detailsByProduct(idProduct);
+    }
 }
