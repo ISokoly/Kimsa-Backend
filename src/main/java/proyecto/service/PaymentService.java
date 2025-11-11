@@ -12,7 +12,8 @@ import proyecto.service.interfaces.InterPaymentService;
 
 import java.util.List;
 
-@Service @RequiredArgsConstructor
+@Service
+@RequiredArgsConstructor
 public class PaymentService implements InterPaymentService {
 
     private final PaymentRepo paymentRepo;
@@ -29,16 +30,16 @@ public class PaymentService implements InterPaymentService {
     }
 
     @Transactional
-    @Override
-    public PaymentDTO create(PaymentDTO dto) {
+    public PaymentDTO createSimple(PaymentDTO dto) {
         Order order = orderRepo.findById(dto.getIdOrder())
                 .orElseThrow(() -> new IllegalArgumentException("Pedido no encontrado"));
+
         Payment p = new Payment();
         p.setOrder(order);
         p.setAmount(dto.getAmount());
         p.setPaymentType(dto.getPaymentType());
-        p = paymentRepo.save(p);
-        return toDTO(p);
+        p.setPaymentDate(dto.getPaymentDate());
+        return toDTO(paymentRepo.save(p));
     }
 
     @Transactional
@@ -48,8 +49,8 @@ public class PaymentService implements InterPaymentService {
         if (p == null) return null;
         if (dto.getAmount() != null) p.setAmount(dto.getAmount());
         if (dto.getPaymentType() != null) p.setPaymentType(dto.getPaymentType());
-        p = paymentRepo.save(p);
-        return toDTO(p);
+        if (dto.getPaymentDate() != null) p.setPaymentDate(dto.getPaymentDate());
+        return toDTO(paymentRepo.save(p));
     }
 
     private PaymentDTO toDTO(Payment p) {

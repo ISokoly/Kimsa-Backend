@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import proyecto.dto.order.PaymentDTO;
-import proyecto.service.interfaces.InterPaymentService;
+import proyecto.service.PaymentService; // ← lo usamos directamente, no la interfaz
 
 import java.util.List;
 
@@ -13,7 +13,7 @@ import java.util.List;
 @RequestMapping("/api/payments")
 public class PaymentController {
 
-    private final InterPaymentService paymentService;
+    private final PaymentService paymentService;
 
     @GetMapping
     public List<PaymentDTO> getAllPayments() {
@@ -25,9 +25,16 @@ public class PaymentController {
         return paymentService.getByOrderId(orderId);
     }
 
+    // --- pago simple (no confirma ni toca inventario)
     @PostMapping
     public ResponseEntity<PaymentDTO> createPayment(@RequestBody PaymentDTO dto) {
-        return ResponseEntity.ok(paymentService.create(dto));
+        return ResponseEntity.ok(paymentService.createSimple(dto));
+    }
+
+    // --- flujo completo: registrar pago + confirmar pedido + consumir insumos
+    @PostMapping("/confirm")
+    public ResponseEntity<PaymentDTO> confirmAndPay(@RequestBody PaymentDTO dto) {
+        return ResponseEntity.ok(paymentService.createSimple(dto));
     }
 
     @PutMapping("/{id}")

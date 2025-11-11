@@ -42,12 +42,4 @@ public class SupplyController {
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-
-
-    @PatchMapping("/{id}/toggle")
-    public void toggle(@PathVariable Integer id) {
-        Supply db = repo.findById(id).orElseThrow();
-        db.setActive(!db.isActive());
-        repo.save(db);
-    }
 }

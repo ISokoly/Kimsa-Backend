@@ -7,6 +7,6 @@ import java.util.List;
 public interface InterPaymentService {
     List<PaymentDTO> getAll();
     List<PaymentDTO> getByOrderId(Integer idOrder);
-    PaymentDTO create(PaymentDTO dto);
+    PaymentDTO createSimple(PaymentDTO dto);
     PaymentDTO update(Integer id, PaymentDTO dto);
 }

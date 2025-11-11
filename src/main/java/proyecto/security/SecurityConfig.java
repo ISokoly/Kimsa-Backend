@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,33 +29,35 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        return request -> {
-            var c = new CorsConfiguration();
-            c.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173"));
-            c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-            c.setAllowedHeaders(List.of("Content-Type", "Authorization"));
-            c.setAllowCredentials(true); // necesario para cookies
-            c.setMaxAge(3600L);
-            return c;
-        };
-    }
-
-    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/uploads/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments").permitAll() // <- SOLO para probar
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthFilter(jwtService),
                         org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        return request -> {
+            var c = new CorsConfiguration();
+            c.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173"));
+            c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+            c.setAllowedHeaders(List.of("*"));                 // ← clave
+            c.setExposedHeaders(List.of("Authorization"));     // opcional
+            c.setAllowCredentials(true);
+            c.setMaxAge(3600L);
+            return c;
+        };
     }
 }
