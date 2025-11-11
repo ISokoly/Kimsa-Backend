@@ -25,7 +25,7 @@ public class PurchaseService {
     private final SupplyRepository supplyRepo;
 
     @Transactional
-    public List<Purchase> createMany(PurchaseCreateDTO dto){
+    public List<Purchase> createMany(PurchaseCreateDTO dto) {
         Supplier supplier = supplierRepo.findById(dto.idSupplier())
                 .orElseThrow(() -> new IllegalArgumentException("Supplier no encontrado"));
         if (!supplier.isActive()) throw new IllegalStateException("Supplier inactivo");
@@ -37,20 +37,25 @@ public class PurchaseService {
                     .orElseThrow(() -> new IllegalArgumentException("Supply no encontrado: " + item.idSupply()));
             if (!supply.isActive()) throw new IllegalStateException("Supply inactivo: " + supply.getName());
 
+            BigDecimal quantity = item.quantity();
+            if (supply.getUnit() == Supply.SupplyUnit.Grams || supply.getUnit() == Supply.SupplyUnit.Milliliters) {
+                quantity = quantity.multiply(BigDecimal.valueOf(1000));
+            }
+
             BigDecimal unit = supply.getUnitPrice() != null ? supply.getUnitPrice() : BigDecimal.ZERO;
-            BigDecimal total = unit.multiply(item.quantity());
+            BigDecimal total = unit.multiply(quantity);
 
             Purchase p = new Purchase();
             p.setSupplier(supplier);
             p.setSupply(supply);
-            p.setQuantity(item.quantity());
+            p.setQuantity(quantity);
             p.setTotal(total);
 
             Purchase saved = purchaseRepo.save(p);
             created.add(saved);
 
             BigDecimal curr = supply.getCurrentStock() != null ? supply.getCurrentStock() : BigDecimal.ZERO;
-            supply.setCurrentStock(curr.add(item.quantity()));
+            supply.setCurrentStock(curr.add(quantity));
             supplyRepo.save(supply);
         }
 
