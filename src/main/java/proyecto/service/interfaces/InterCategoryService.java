@@ -11,4 +11,5 @@ public interface InterCategoryService {
     Category getCategoryByName(String name);
 
     Category disableCategoryAndProducts(Integer id);
+    Category enableCategoryAndProducts(Integer id);
 }

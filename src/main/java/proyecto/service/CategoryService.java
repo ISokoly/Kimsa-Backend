@@ -50,6 +50,20 @@ public class CategoryService implements InterCategoryService {
         return repo.save(category);
     }
 
+    public Category enableCategoryAndProducts(Integer idCategory) {
+        Category category = repo.findById(idCategory)
+                .orElseThrow(() -> new IllegalArgumentException("Categoría no encontrada"));
+
+        category.setDisabled(false);
+
+        if (category.getProducts() != null) {
+            for (Product product : category.getProducts()) {
+                product.setDisabled(false);
+            }
+        }
+        return repo.save(category);
+    }
+
     public List<Category> getAllCategories() {
         return repo.findAll();
     }

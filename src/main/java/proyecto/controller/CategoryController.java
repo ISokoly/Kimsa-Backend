@@ -87,4 +87,14 @@ public class CategoryController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @PutMapping("/{id}/enable")
+    public ResponseEntity<Category> enableCategory(@PathVariable Integer id) {
+        try {
+            Category updated = service.enableCategoryAndProducts(id);
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
