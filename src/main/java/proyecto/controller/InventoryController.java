@@ -28,14 +28,4 @@ public class InventoryController {
     public ResponseEntity<InventoryService.AdjustmentSummary> refund(@PathVariable Integer orderId) {
         return ResponseEntity.ok(inventoryService.refundForOrderId(orderId));
     }
-
-    @PostMapping("/check-items")
-    public ResponseEntity<?> checkItems(
-            @RequestParam(name = "safety", defaultValue = "10") int safetyPercent,
-            @RequestBody Map<String, List<Map<String, Integer>>> body
-    ) {
-        List<Map<String, Integer>> items = body.getOrDefault("items", List.of());
-        var result = inventoryService.checkItems(items, safetyPercent);
-        return ResponseEntity.ok(result);
-    }
 }

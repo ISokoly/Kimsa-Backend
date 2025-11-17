@@ -24,6 +24,8 @@ public interface RecipeDetailRepository extends JpaRepository<RecipeDetail, Inte
            """)
     List<RecipeDetail> findWithSupplyByProductId(@Param("idProduct") Integer idProduct);
 
+    List<RecipeDetail> findByRecipe_Product_IdProduct(Integer idProduct);
+
     void deleteByRecipe_IdRecipe(Integer idRecipe);
 
     Optional<RecipeDetail> findByRecipe_IdRecipeAndSupply_IdSupply(Integer idRecipe, Integer idSupply);

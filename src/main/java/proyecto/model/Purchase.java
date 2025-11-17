@@ -7,6 +7,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data @NoArgsConstructor @AllArgsConstructor
 @Entity @Table(name = "Purchases")
@@ -21,19 +23,18 @@ public class Purchase {
     @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
     private Supplier supplier;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "idSupply", nullable = false, referencedColumnName = "idSupply")
-    @JsonIgnoreProperties({"hibernateLazyInitializer","handler"})
-    private Supply supply;
-
-    @Column(nullable = false, precision = 10, scale = 2)
-    @NotNull @DecimalMin("0.01")
-    private BigDecimal quantity;
-
     @Column(name = "purchaseDate")
     private LocalDateTime purchaseDate = LocalDateTime.now();
 
     @Column(nullable = false, precision = 12, scale = 2)
     @NotNull @DecimalMin("0.00")
-    private BigDecimal total;
+    private BigDecimal total = BigDecimal.ZERO;
+
+    @OneToMany(
+            mappedBy = "purchase",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @JsonIgnoreProperties({"purchase","hibernateLazyInitializer","handler"})
+    private List<PurchaseItem> items = new ArrayList<>();
 }

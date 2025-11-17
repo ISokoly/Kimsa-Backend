@@ -5,16 +5,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import proyecto.dto.purchase.PurchaseCreateDTO;
 import proyecto.dto.purchase.PurchaseItemDTO;
-import proyecto.model.Purchase;
-import proyecto.model.Supplier;
-import proyecto.model.Supply;
-import proyecto.repo.PurchaseRepository;
-import proyecto.repo.SupplierRepository;
-import proyecto.repo.SupplyRepository;
+import proyecto.dto.purchase.PurchaseUpdateDTO;
+import proyecto.model.*;
+import proyecto.repo.*;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -23,42 +19,141 @@ public class PurchaseService {
     private final PurchaseRepository purchaseRepo;
     private final SupplierRepository supplierRepo;
     private final SupplyRepository supplyRepo;
+    private final PurchaseItemRepository purchaseItemRepo;
 
+    /* ========== CREAR COMPRA ========== */
     @Transactional
-    public List<Purchase> createMany(PurchaseCreateDTO dto) {
+    public Purchase create(PurchaseCreateDTO dto) {
         Supplier supplier = supplierRepo.findById(dto.idSupplier())
                 .orElseThrow(() -> new IllegalArgumentException("Supplier no encontrado"));
-        if (!supplier.isActive()) throw new IllegalStateException("Supplier inactivo");
+        if (!supplier.isActive()) {
+            throw new IllegalStateException("Supplier inactivo");
+        }
 
-        List<Purchase> created = new ArrayList<>();
+        Purchase purchase = new Purchase();
+        purchase.setSupplier(supplier);
 
-        for (PurchaseItemDTO item : dto.items()) {
-            Supply supply = supplyRepo.findById(item.idSupply())
-                    .orElseThrow(() -> new IllegalArgumentException("Supply no encontrado: " + item.idSupply()));
-            if (!supply.isActive()) throw new IllegalStateException("Supply inactivo: " + supply.getName());
+        BigDecimal grandTotal = BigDecimal.ZERO;
+        List<PurchaseItem> items = new ArrayList<>();
 
-            BigDecimal quantity = item.quantity();
-            if (supply.getUnit() == Supply.SupplyUnit.Grams || supply.getUnit() == Supply.SupplyUnit.Milliliters) {
-                quantity = quantity.multiply(BigDecimal.valueOf(1000));
+        for (PurchaseItemDTO itemDto : dto.items()) {
+            Supply supply = supplyRepo.findById(itemDto.idSupply())
+                    .orElseThrow(() -> new IllegalArgumentException("Supply no encontrado: " + itemDto.idSupply()));
+            if (!supply.isActive()) {
+                throw new IllegalStateException("Supply inactivo: " + supply.getName());
             }
 
-            BigDecimal unit = supply.getUnitPrice() != null ? supply.getUnitPrice() : BigDecimal.ZERO;
-            BigDecimal total = unit.multiply(quantity);
+            // qty que viene del frontend: en unidades visibles (unidades, kg, L)
+            BigDecimal qtyBase = itemDto.quantity();
+            if (supply.getUnit() == Supply.SupplyUnit.Grams ||
+                    supply.getUnit() == Supply.SupplyUnit.Milliliters) {
+                qtyBase = qtyBase.multiply(BigDecimal.valueOf(1000)); // a gramos / ml
+            }
 
-            Purchase p = new Purchase();
-            p.setSupplier(supplier);
-            p.setSupply(supply);
-            p.setQuantity(quantity);
-            p.setTotal(total);
+            BigDecimal unitPrice = supply.getUnitPrice() != null ? supply.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal subtotal = unitPrice.multiply(qtyBase);
 
-            Purchase saved = purchaseRepo.save(p);
-            created.add(saved);
+            PurchaseItem pi = new PurchaseItem();
+            pi.setPurchase(purchase);
+            pi.setSupply(supply);
+            pi.setQuantity(qtyBase);      // SIEMPRE en unidad base
+            pi.setUnitPrice(unitPrice);
+            pi.setSubtotal(subtotal);
 
+            items.add(pi);
+            grandTotal = grandTotal.add(subtotal);
+
+            // stock: se suma en unidad base
             BigDecimal curr = supply.getCurrentStock() != null ? supply.getCurrentStock() : BigDecimal.ZERO;
-            supply.setCurrentStock(curr.add(quantity));
+            supply.setCurrentStock(curr.add(qtyBase));
             supplyRepo.save(supply);
         }
 
-        return created;
+        purchase.setTotal(grandTotal);
+        purchase.setItems(items);
+
+        Purchase saved = purchaseRepo.save(purchase);
+        purchaseItemRepo.saveAll(items); // opcional si tienes cascade ALL
+
+        return saved;
+    }
+
+    /* ========== ACTUALIZAR COMPRA ========== */
+    @Transactional
+    public Purchase update(Integer id, PurchaseUpdateDTO dto) {
+        Purchase existing = purchaseRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Compra no encontrada"));
+
+        Supplier supplier = supplierRepo.findById(dto.idSupplier())
+                .orElseThrow(() -> new IllegalArgumentException("Proveedor no encontrado"));
+
+        existing.setSupplier(supplier);
+
+        // ===== Mapear cantidades antiguas por insumo (en unidad base) =====
+        Map<Integer, BigDecimal> oldMap = new HashMap<>();
+        for (PurchaseItem pi : existing.getItems()) {
+            Integer sid = pi.getSupply().getIdSupply();
+            BigDecimal qty = pi.getQuantity() != null ? pi.getQuantity() : BigDecimal.ZERO;
+            oldMap.merge(sid, qty, BigDecimal::add);
+        }
+
+        // ===== Construir nuevos items y mapear cantidades nuevas =====
+        List<PurchaseItem> newItems = new ArrayList<>();
+        Map<Integer, BigDecimal> newMap = new HashMap<>();
+        BigDecimal grandTotal = BigDecimal.ZERO;
+
+        for (PurchaseItemDTO itemDto : dto.items()) {
+            Supply supply = supplyRepo.findById(itemDto.idSupply())
+                    .orElseThrow(() -> new IllegalArgumentException("Supply no encontrado: " + itemDto.idSupply()));
+            if (!supply.isActive()) {
+                throw new IllegalStateException("Supply inactivo: " + supply.getName());
+            }
+
+            BigDecimal qtyBase = itemDto.quantity();
+            if (supply.getUnit() == Supply.SupplyUnit.Grams ||
+                    supply.getUnit() == Supply.SupplyUnit.Milliliters) {
+                qtyBase = qtyBase.multiply(BigDecimal.valueOf(1000)); // a gramos / ml
+            }
+
+            BigDecimal unitPrice = supply.getUnitPrice() != null ? supply.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal subtotal = unitPrice.multiply(qtyBase);
+
+            PurchaseItem pi = new PurchaseItem();
+            pi.setPurchase(existing);
+            pi.setSupply(supply);
+            pi.setQuantity(qtyBase);
+            pi.setUnitPrice(unitPrice);
+            pi.setSubtotal(subtotal);
+
+            newItems.add(pi);
+            newMap.merge(supply.getIdSupply(), qtyBase, BigDecimal::add);
+
+            grandTotal = grandTotal.add(subtotal);
+        }
+
+        // ===== Ajustar stock por diferencia (new - old) =====
+        Set<Integer> allIds = new HashSet<>();
+        allIds.addAll(oldMap.keySet());
+        allIds.addAll(newMap.keySet());
+
+        for (Integer sid : allIds) {
+            BigDecimal oldQty = oldMap.getOrDefault(sid, BigDecimal.ZERO);
+            BigDecimal newQty = newMap.getOrDefault(sid, BigDecimal.ZERO);
+            BigDecimal diff = newQty.subtract(oldQty); // puede ser negativa
+
+            if (diff.compareTo(BigDecimal.ZERO) != 0) {
+                Supply supply = supplyRepo.findById(sid)
+                        .orElseThrow(() -> new IllegalArgumentException("Supply no encontrado: " + sid));
+                BigDecimal curr = supply.getCurrentStock() != null ? supply.getCurrentStock() : BigDecimal.ZERO;
+                supply.setCurrentStock(curr.add(diff));
+                supplyRepo.save(supply);
+            }
+        }
+
+        existing.getItems().clear();
+        existing.getItems().addAll(newItems);
+        existing.setTotal(grandTotal);
+
+        return purchaseRepo.save(existing);
     }
 }
