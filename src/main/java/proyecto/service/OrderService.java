@@ -20,6 +20,9 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class OrderService implements InterOrderService {
+
+    private static final String GENERIC_DNI = "00000001";
+
     private final OrderRepo orderRepo;
     private final OrderDetailRepo detailRepo;
     private final ProductRepo productRepo;
@@ -49,7 +52,11 @@ public class OrderService implements InterOrderService {
         final LocalDate today = LocalDate.now();
 
         Order o = new Order();
-        o.setClient(em.getReference(Client.class, dto.getIdClient()));
+
+        // 🔹 Obtenemos el cliente completo (para saber si es genérico y su fecha de nacimiento)
+        Client client = em.getReference(Client.class, dto.getIdClient());
+        o.setClient(client);
+
         o.setUser(em.getReference(User.class, dto.getIdUser()));
         o.setOrderDate(today);
         o.setOrderTime(LocalTime.now());
@@ -84,7 +91,9 @@ public class OrderService implements InterOrderService {
             int quantity = item.getQuantity() != null ? item.getQuantity() : 1;
 
             BigDecimal baseUnit = BigDecimal.valueOf(p.getPrice());
-            int pct = getApplicableDiscountPct(p.getIdProduct(), today);
+
+            // 🎂 Descuento considerando cumpleaños (cliente NO genérico)
+            int pct = getApplicableDiscountPct(p.getIdProduct(), today, client);
 
             BigDecimal unitWithDiscount = baseUnit
                     .multiply(BigDecimal.ONE.subtract(
@@ -118,8 +127,12 @@ public class OrderService implements InterOrderService {
 
         Integer prevTableId = (o.getTable() != null) ? o.getTable().getIdTable() : null;
 
-        if (dto.getIdClient() != null) o.setClient(em.getReference(Client.class, dto.getIdClient()));
-        if (dto.getIdUser() != null) o.setUser(em.getReference(User.class, dto.getIdUser()));
+        if (dto.getIdClient() != null) {
+            o.setClient(em.getReference(Client.class, dto.getIdClient()));
+        }
+        if (dto.getIdUser() != null) {
+            o.setUser(em.getReference(User.class, dto.getIdUser()));
+        }
 
         if (dto.getDelivery() != null || dto.getIdTable() != null) {
             if (Boolean.TRUE.equals(dto.getDelivery())) {
@@ -150,6 +163,7 @@ public class OrderService implements InterOrderService {
                 }
             }
         }
+
         if (dto.getStatus() != null) {
             o.setStatus(dto.getStatus());
 
@@ -164,8 +178,12 @@ public class OrderService implements InterOrderService {
                 }
             }
         }
+
         if (dto.getItems() != null) {
             LocalDate refDate = (o.getOrderDate() != null) ? o.getOrderDate() : LocalDate.now();
+
+            // Cliente que queda finalmente en la orden (puede ser actualizado arriba)
+            Client client = o.getClient();
 
             List<OrderDetail> current = o.getDetails();
             if (current != null && !current.isEmpty()) {
@@ -182,7 +200,9 @@ public class OrderService implements InterOrderService {
                 int quantity = (item.getQuantity() != null) ? item.getQuantity() : 1;
 
                 BigDecimal baseUnit = BigDecimal.valueOf(p.getPrice());
-                int pct = getApplicableDiscountPct(p.getIdProduct(), refDate);
+
+                // 🎂 Descuento considerando cumpleaños (cliente NO genérico)
+                int pct = getApplicableDiscountPct(p.getIdProduct(), refDate, client);
 
                 BigDecimal unitWithDiscount = baseUnit
                         .multiply(BigDecimal.ONE.subtract(
@@ -218,6 +238,7 @@ public class OrderService implements InterOrderService {
     }
 
     /* ==================== Helpers ==================== */
+
     private RestaurantTable requireUsableTable(Integer tableId, Integer allowedBusyIdIfSame) {
         if (tableId == null) {
             throw new RuntimeException("Debe seleccionar una mesa o marcar delivery.");
@@ -238,6 +259,21 @@ public class OrderService implements InterOrderService {
         return t;
     }
 
+    /**
+     * 🎂 Si es cliente NO genérico y hoy es su cumpleaños → 50% fijo.
+     * En caso contrario, usa la lógica normal de descuentos por día y producto.
+     */
+    private int getApplicableDiscountPct(Integer idProduct, LocalDate date, Client client) {
+        if (isBirthdayNonGeneric(client, date)) {
+            return 50;
+        }
+        // Lógica normal que ya tenías
+        return getApplicableDiscountPct(idProduct, date);
+    }
+
+    /**
+     * Lógica original de descuentos por producto/día (sin cumpleaños).
+     */
     private int getApplicableDiscountPct(Integer idProduct, LocalDate date) {
         if (idProduct == null) return 0;
 
@@ -267,6 +303,24 @@ public class OrderService implements InterOrderService {
                 .map(Discount::getPercentage)
                 .max(Comparator.naturalOrder())
                 .orElse(0);
+    }
+
+    /**
+     * Devuelve true si el cliente NO es genérico y la fecha coincide con su cumpleaños (mes/día).
+     */
+    private boolean isBirthdayNonGeneric(Client c, LocalDate date) {
+        if (c == null) return false;
+
+        // Genérico: no aplica promo cumpleaños
+        if (c.getDni() != null && GENERIC_DNI.equals(c.getDni())) {
+            return false;
+        }
+
+        LocalDate birth = c.getBirthdate();
+        if (birth == null) return false;
+
+        return birth.getMonthValue() == date.getMonthValue()
+                && birth.getDayOfMonth() == date.getDayOfMonth();
     }
 
     private Discount.DayWeek mapDayOfWeek(DayOfWeek dow) {
