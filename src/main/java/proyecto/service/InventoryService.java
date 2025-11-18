@@ -29,9 +29,20 @@ public class InventoryService {
     private static final int SCALE = 2;
 
     public record AdjustmentItem(Integer idSupply, String name,
-                                 BigDecimal before, BigDecimal delta, BigDecimal after) {}
+                                 BigDecimal before, BigDecimal delta, BigDecimal after) {
+    }
 
-    public record AdjustmentSummary(Integer idOrder, List<AdjustmentItem> items) {}
+    public record AdjustmentSummary(Integer idOrder, List<AdjustmentItem> items) {
+    }
+
+    // ⭐ NUEVO: DTO simple para exponer stock por insumo asociado a la orden
+    public record SupplyLowStockDTO(
+            Integer idSupply,
+            String name,
+            String unit,
+            BigDecimal currentStock
+    ) {
+    }
 
     @Transactional
     public AdjustmentSummary consumeForOrderId(Integer idOrder, boolean forbidNegative) {
@@ -47,14 +58,15 @@ public class InventoryService {
         return refundForOrder(order);
     }
 
-    /** Consume stock de insumos por todos los detalles del pedido. */
+    /**
+     * Consume stock de insumos por todos los detalles del pedido.
+     */
     @Transactional
     public AdjustmentSummary consumeForOrder(Order order, boolean forbidNegative) {
         if (order == null || order.getDetails() == null || order.getDetails().isEmpty()) {
             return new AdjustmentSummary(order != null ? order.getIdOrder() : null, List.of());
         }
 
-        log.info("[INV] Consumo para pedido {} con {} detalle(s)", order.getIdOrder(), order.getDetails().size());
         Map<Integer, AdjustmentItem> changes = new LinkedHashMap<>();
 
         for (OrderDetail d : order.getDetails()) {
@@ -62,8 +74,6 @@ public class InventoryService {
 
             Integer idProduct = d.getProduct().getIdProduct();
             List<RecipeDetail> receta = recipeDetailRepo.findWithSupplyByProductId(idProduct);
-            log.info("[INV] Producto {} (detalle {}): {} receta(s) encontradas",
-                    idProduct, d.getIdDetail(), receta.size());
 
             BigDecimal qtyProd = BigDecimal.valueOf(d.getQuantity());
 
@@ -82,8 +92,6 @@ public class InventoryService {
                     throw new IllegalStateException("Stock insuficiente para insumo '" + s.getName()
                             + "' (id=" + s.getIdSupply() + "). Requerido: " + consumo + ", Disponible: " + before);
                 }
-
-                log.info("[INV] Supply {}: stock {} - consumo {} = {}", s.getIdSupply(), before, consumo, after);
                 s.setCurrentStock(after);
                 supplyRepo.save(s);
 
@@ -131,5 +139,46 @@ public class InventoryService {
             }
         }
         return new AdjustmentSummary(order.getIdOrder(), new ArrayList<>(changes.values()));
+    }
+
+    @Transactional
+    public List<SupplyLowStockDTO> getLowStockByOrder(Integer idOrder) {
+        Order order = orderRepo.findById(idOrder)
+                .orElseThrow(() -> new IllegalArgumentException("Orden no encontrada: " + idOrder));
+
+        if (order.getDetails() == null || order.getDetails().isEmpty()) {
+            return List.of();
+        }
+
+        // Usamos un map para no repetir el mismo insumo varias veces
+        Map<Integer, Supply> suppliesMap = new LinkedHashMap<>();
+
+        for (OrderDetail d : order.getDetails()) {
+            if (d.getProduct() == null) continue;
+
+            Integer idProduct = d.getProduct().getIdProduct();
+            List<RecipeDetail> receta = recipeDetailRepo.findWithSupplyByProductId(idProduct);
+
+            for (RecipeDetail rd : receta) {
+                Supply s = rd.getSupply();
+                if (s == null || s.getIdSupply() == null) continue;
+                suppliesMap.putIfAbsent(s.getIdSupply(), s);
+            }
+        }
+
+        List<SupplyLowStockDTO> result = new ArrayList<>();
+        for (Supply s : suppliesMap.values()) {
+            String unit = s.getUnit() != null ? String.valueOf(s.getUnit()) : "";
+            BigDecimal stock = s.getCurrentStock() != null ? s.getCurrentStock() : BigDecimal.ZERO;
+
+            result.add(new SupplyLowStockDTO(
+                    s.getIdSupply(),
+                    s.getName(),
+                    unit,
+                    stock
+            ));
+        }
+
+        return result;
     }
 }

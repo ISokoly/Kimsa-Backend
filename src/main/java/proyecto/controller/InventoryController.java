@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.*;
 import proyecto.service.InventoryService;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,5 +26,12 @@ public class InventoryController {
     @PostMapping("/refund/{orderId}")
     public ResponseEntity<InventoryService.AdjustmentSummary> refund(@PathVariable Integer orderId) {
         return ResponseEntity.ok(inventoryService.refundForOrderId(orderId));
+    }
+
+    @GetMapping("/low-stock-by-order/{idOrder}")
+    public ResponseEntity<List<InventoryService.SupplyLowStockDTO>> getLowStockByOrder(
+            @PathVariable Integer idOrder
+    ) {
+        return ResponseEntity.ok(inventoryService.getLowStockByOrder(idOrder));
     }
 }
