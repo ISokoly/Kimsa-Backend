@@ -17,8 +17,7 @@ public class WebConfig {
                 r.addMapping("/**")
                         .allowedOrigins(
                                 "http://localhost:4200",
-                                "https://isokoly.github.io",
-                                "https://isokoly.github.io/Kimsa-Java"
+                                "https://kimsa-java.netlify.app/"
                         )
                         .allowedMethods("GET","POST","PUT","DELETE","OPTIONS")
                         .allowedHeaders("*")

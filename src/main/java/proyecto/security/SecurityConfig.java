@@ -50,7 +50,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         return request -> {
             var c = new CorsConfiguration();
-            c.setAllowedOrigins(List.of("http://localhost:4200", "https://isokoly.github.io", "https://isokoly.github.io/Kimsa-Java"));
+            c.setAllowedOrigins(List.of("http://localhost:4200", "https://kimsa-java.netlify.app/"));
             c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
             c.setAllowedHeaders(List.of("*"));                 // ← clave
             c.setExposedHeaders(List.of("Authorization"));     // opcional
