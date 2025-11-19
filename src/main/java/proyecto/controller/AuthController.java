@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import proyecto.dto.login.LoginResponse;
 import proyecto.dto.user.UserDTO;
 import proyecto.dto.login.LoginRequest;
 import proyecto.security.JwtAuthFilter;
@@ -18,20 +19,23 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<UserDTO> login(@RequestBody LoginRequest request, HttpServletResponse resp) {
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request, HttpServletResponse resp) {
         var result = authService.login(request.username(), request.password());
 
-        // Cookie HttpOnly con el JWT
+        // Cookie HttpOnly con el JWT (la puedes dejar si quieres modo cookie)
         Cookie cookie = new Cookie(JwtAuthFilter.COOKIE_NAME, result.token());
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
+        cookie.setSecure(false); // en producción con HTTPS pon true
         cookie.setPath("/");
         cookie.setMaxAge(12 * 60 * 60);
-        cookie.setAttribute("SameSite", "Lax");
+        cookie.setAttribute("SameSite", "Lax"); // o "None" si usas dominios distintos con HTTPS
         resp.addCookie(cookie);
 
-        return ResponseEntity.ok(result.user());
+        // 👉 AHORA TAMBIÉN devolvemos token + user en el body
+        LoginResponse body = new LoginResponse(result.token(), result.user());
+        return ResponseEntity.ok(body);
     }
+
 
     @GetMapping("/me")
     public ResponseEntity<UserDTO> me() {
