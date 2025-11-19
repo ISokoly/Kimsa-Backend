@@ -15,7 +15,11 @@ public class WebConfig {
             @Override
             public void addCorsMappings(CorsRegistry r) {
                 r.addMapping("/**")
-                        .allowedOrigins("http://localhost:4200")
+                        .allowedOrigins(
+                                "http://localhost:4200",
+                                "https://isokoly.github.io",
+                                "https://isokoly.github.io/Kimsa-Java"
+                        )
                         .allowedMethods("GET","POST","PUT","DELETE","OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
