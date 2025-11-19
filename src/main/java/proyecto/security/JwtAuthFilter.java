@@ -1,4 +1,3 @@
-// src/main/java/proyecto/security/JwtAuthFilter.java
 package proyecto.security;
 
 import jakarta.servlet.FilterChain;
@@ -24,15 +23,30 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwt;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain)
             throws ServletException, IOException {
 
-        String token = extractFromCookie(request, COOKIE_NAME).orElse(null);
+        String token = null;
+
+        // 1) Intentar primero desde el header Authorization: Bearer xxx
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+
+        // 2) Si no hay header, intentar desde la cookie
+        if (token == null) {
+            token = extractFromCookie(request, COOKIE_NAME).orElse(null);
+        }
+
         if (token != null) {
             try {
                 var claims = jwt.parser().parseSignedClaims(token).getPayload();
                 String username = claims.getSubject();
                 String role = String.valueOf(claims.get("role"));
+
                 var auth = new UsernamePasswordAuthenticationToken(
                         username,
                         null,
@@ -40,6 +54,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 );
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } catch (Exception ignored) {
+                // Si el token es inválido o expiró, lo ignoramos y sigue sin autenticación
             }
         }
 
@@ -50,7 +65,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private Optional<String> extractFromCookie(HttpServletRequest request, String name) {
         if (request.getCookies() == null) return Optional.empty();
         for (Cookie c : request.getCookies()) {
-            if (name.equals(c.getName())) return Optional.ofNullable(c.getValue());
+            if (name.equals(c.getName())) {
+                return Optional.ofNullable(c.getValue());
+            }
         }
         return Optional.empty();
     }
