@@ -38,7 +38,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/uploads/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/payments").permitAll() // <- SOLO para probar
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(new JwtAuthFilter(jwtService),
@@ -51,7 +50,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         return request -> {
             var c = new CorsConfiguration();
-            c.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173"));
+            c.setAllowedOrigins(List.of("http://localhost:4200", "https://isokoly.github.io", "https://isokoly.github.io/Kimsa-Java"));
             c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
             c.setAllowedHeaders(List.of("*"));                 // ← clave
             c.setExposedHeaders(List.of("Authorization"));     // opcional
